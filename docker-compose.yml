@@ -31,6 +31,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./scripts:/app/scripts
+      - ./data:/app/data
 
 volumes:
   postgres_:
