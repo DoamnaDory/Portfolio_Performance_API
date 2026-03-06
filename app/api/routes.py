@@ -9,14 +9,14 @@ from app.domain.models import (
     TransactionResponse
 )
 from app.domain.services import PortfolioService
-from app.infrastructure.repositories import TransactionRepository, PortfolioRepository
+from app.infrastructure.repositories import TransactionRepository, \
+    PortfolioRepository
 from typing import List
 
 router = APIRouter(prefix="/api/v1")
 
 
 # Портфели
-
 @router.post(
     "/portfolios/",
     response_model=PortfolioResponse,
@@ -26,8 +26,8 @@ router = APIRouter(prefix="/api/v1")
     tags=["Портфели"]
 )
 async def create_portfolio(
-    portfolio: PortfolioCreate,
-    db: AsyncSession = Depends(get_db)
+        portfolio: PortfolioCreate,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Создать новый портфель.
@@ -61,8 +61,8 @@ async def get_portfolios(db: AsyncSession = Depends(get_db)):
     tags=["Портфели"]
 )
 async def get_portfolio(
-    portfolio_id: int,
-    db: AsyncSession = Depends(get_db)
+        portfolio_id: int,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Получить детали портфеля по ID.
@@ -84,8 +84,8 @@ async def get_portfolio(
     tags=["Портфели"]
 )
 async def delete_portfolio(
-    portfolio_id: int,
-    db: AsyncSession = Depends(get_db)
+        portfolio_id: int,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Удалить портфель по ID.
@@ -109,8 +109,8 @@ async def delete_portfolio(
     tags=["Транзакции"]
 )
 async def add_transaction(
-    transaction: TransactionCreate,
-    db: AsyncSession = Depends(get_db)
+        transaction: TransactionCreate,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Добавить новую транзакцию (покупка/продажа).
@@ -128,7 +128,8 @@ async def add_transaction(
 
     repo = TransactionRepository(db)
     await repo.add_transaction(transaction)
-    return {"message": "Транзакция успешно добавлена", "portfolio_id": transaction.portfolio_id}
+    return {"message": "Транзакция успешно добавлена",
+            "portfolio_id": transaction.portfolio_id}
 
 
 @router.get(
@@ -139,8 +140,8 @@ async def add_transaction(
     tags=["Транзакции"]
 )
 async def get_transactions(
-    portfolio_id: int,
-    db: AsyncSession = Depends(get_db)
+        portfolio_id: int,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Получить историю транзакций для портфеля.
@@ -157,7 +158,6 @@ async def get_transactions(
 
 
 # Метрики
-
 @router.get(
     "/portfolios/{portfolio_id}/performance",
     response_model=PortfolioPerformance,
@@ -166,8 +166,8 @@ async def get_transactions(
     tags=["Метрики"]
 )
 async def get_portfolio_performance(
-    portfolio_id: int,
-    db: AsyncSession = Depends(get_db)
+        portfolio_id: int,
+        db: AsyncSession = Depends(get_db)
 ):
     """
     Рассчитать метрики эффективности портфеля.
@@ -180,11 +180,12 @@ async def get_portfolio_performance(
         raise HTTPException(status_code=404, detail="Портфель не найден")
 
     service = PortfolioService(db)
-    return await service.calculate_performance(portfolio_id)
+    result = await service.calculate_performance(portfolio_id)
+
+    return result
 
 
 # Main
-
 @router.get("/", tags=["Main"])
 async def root():
     """
