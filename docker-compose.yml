@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:17-alpine
@@ -10,9 +8,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_/var/lib/postgresql/data
+      - postgres_:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-portfolio_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-portfolio_user} -d ${DB_NAME:-portfolio_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,8 +30,7 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
-      - ./alembic:/app/alembic
       - ./scripts:/app/scripts
 
 volumes:
-  postgres_data:
+  postgres_:
