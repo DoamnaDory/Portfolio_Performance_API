@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from decimal import Decimal
-from typing import Optional
 
 
 class TransactionCreate(BaseModel):
@@ -8,7 +7,7 @@ class TransactionCreate(BaseModel):
     ticker: str
     quantity: Decimal
     price: Decimal
-    transaction_type: str  # 'buy' or 'sell'
+    transaction_type: str
 
 
 class PortfolioPerformance(BaseModel):

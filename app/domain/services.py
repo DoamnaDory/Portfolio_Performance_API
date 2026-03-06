@@ -11,13 +11,13 @@ class PortfolioService:
 
     async def calculate_performance(self, portfolio_id: int) -> Optional[
         PortfolioPerformance]:
-        # 1. Получаем транзакции (асинхронно!)
+        # 1. Получаем транзакции
         transactions = await self.repo.get_transactions_by_portfolio(
             portfolio_id)
 
         # 2. Проверяем, есть ли транзакции
         if not transactions:
-            return None  # Возвращаем None, если портфель не найден или пуст
+            return None
 
         # 3. Считаем метрики
         total_invested = Decimal(0)
@@ -36,7 +36,7 @@ class PortfolioService:
                                                                    Decimal(
                                                                        0)) - tx.quantity
 
-        # Заглушка для текущих цен (в реальности это пришло бы извне)
+        # Заглушка для текущих цен
         current_prices = {"AAPL": Decimal(150), "MSFT": Decimal(300)}
         current_value = Decimal(0)
 

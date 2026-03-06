@@ -19,5 +19,5 @@ class Transaction(Base):
     ticker = Column(String, nullable=False)
     quantity = Column(Numeric(18, 8), nullable=False)
     price = Column(Numeric(18, 8), nullable=False)
-    transaction_type = Column(String, nullable=False)  # 'buy' or 'sell'
+    transaction_type = Column(String, nullable=False)
     transaction_date = Column(DateTime, default=datetime.utcnow)
