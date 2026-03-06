@@ -2,57 +2,54 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.models import PortfolioPerformance
 from app.infrastructure.repositories import TransactionRepository
-from typing import Optional
 
 
 class PortfolioService:
-    def __init__(self, db_session: AsyncSession):
-        self.repo = TransactionRepository(db_session)
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-    async def calculate_performance(self, portfolio_id: int) -> Optional[
-        PortfolioPerformance]:
-        # 1. Получаем транзакции
-        transactions = await self.repo.get_transactions_by_portfolio(
+    async def calculate_performance(self,
+                                    portfolio_id: int) -> PortfolioPerformance:
+        repo = TransactionRepository(self.db)
+        transactions = await repo.get_by_portfolio(
             portfolio_id)
 
-        # 2. Проверяем, есть ли транзакции
         if not transactions:
-            return None
+            return PortfolioPerformance(
+                portfolio_id=portfolio_id,
+                total_invested=Decimal(0),
+                current_value=Decimal(0),
+                roi_percent=Decimal(0)
+            )
 
-        # 3. Считаем метрики
+        holdings = {}
         total_invested = Decimal(0)
-        total_sold = Decimal(0)
-        current_holdings = {}
 
         for tx in transactions:
+            ticker = tx.ticker
+            qty = Decimal(str(tx.quantity))
+            price = Decimal(str(tx.price))
+
             if tx.transaction_type == "buy":
-                total_invested += tx.quantity * tx.price
-                current_holdings[tx.ticker] = current_holdings.get(tx.ticker,
-                                                                   Decimal(
-                                                                       0)) + tx.quantity
+                holdings[ticker] = holdings.get(ticker, Decimal(0)) + qty
+                total_invested += qty * price
             elif tx.transaction_type == "sell":
-                total_sold += tx.quantity * tx.price
-                current_holdings[tx.ticker] = current_holdings.get(tx.ticker,
-                                                                   Decimal(
-                                                                       0)) - tx.quantity
+                holdings[ticker] = holdings.get(ticker, Decimal(0)) - qty
 
         # Заглушка для текущих цен
-        current_prices = {"AAPL": Decimal(150), "MSFT": Decimal(300)}
-        current_value = Decimal(0)
+        current_prices = {"AAPL": Decimal("150"), "MSFT": Decimal("300"),
+                          "TSLA": Decimal("200")}
+        current_value = Decimal(sum(
+            holdings.get(ticker, Decimal(0)) * current_prices.get(ticker,
+                                                                  Decimal(0))
+            for ticker in holdings
+        ))
 
-        for ticker, qty in current_holdings.items():
-            if qty > 0:
-                price = current_prices.get(ticker, Decimal(0))
-                current_value += qty * price
-
-        net_invested = total_invested - total_sold
-        roi = Decimal(0)
-        if net_invested > 0:
-            roi = ((current_value - net_invested) / net_invested) * Decimal(100)
+        roi = ((current_value - total_invested) / total_invested * 100) if total_invested > 0 else Decimal(0)
 
         return PortfolioPerformance(
             portfolio_id=portfolio_id,
-            total_invested=net_invested,
+            total_invested=total_invested,
             current_value=current_value,
-            roi=roi
+            roi_percent=round(roi, 2)
         )
