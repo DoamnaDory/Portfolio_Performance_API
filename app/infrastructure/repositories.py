@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from app.infrastructure.models_orm import Portfolio, Transaction
 from app.domain.models import TransactionCreate, PortfolioCreate
 from typing import List, Optional
+from datetime import datetime, timezone
 
 
 class PortfolioRepository:
@@ -32,7 +33,8 @@ class PortfolioRepository:
         if not portfolio:
             return False
 
-        await self.db.execute(delete(Portfolio).where(Portfolio.id == portfolio_id))
+        await self.db.execute(
+            delete(Portfolio).where(Portfolio.id == portfolio_id))
         await self.db.commit()
         return True
 
@@ -42,16 +44,27 @@ class TransactionRepository:
         self.db = db
 
     async def add_transaction(self, tx: TransactionCreate) -> Transaction:
-        db_tx = Transaction(**tx.model_dump())
+        """Добавить транзакцию  для указанного портфеля."""
+
+        data = tx.model_dump()
+
+        if "transaction_date" in data and data["transaction_date"] is not None:
+            dt = data["transaction_date"]
+            if dt.tzinfo is not None:
+                # Переводим в UTC и отбрасываем информацию о таймзоне
+                data["transaction_date"] = dt.astimezone(timezone.utc).replace(
+                    tzinfo=None)
+
+        db_tx = Transaction(**data)
         self.db.add(db_tx)
         await self.db.commit()
         await self.db.refresh(db_tx)
         return db_tx
 
     async def get_by_portfolio(self, portfolio_id: int) -> List[Transaction]:
+        """Возвращает все транзакции для указанного портфеля."""
+
         result = await self.db.execute(
-            select(Transaction)
-            .where(Transaction.portfolio_id == portfolio_id)
-            .order_by(Transaction.transaction_date.desc())
+            select(Transaction).where(Transaction.portfolio_id == portfolio_id)
         )
         return result.scalars().all()

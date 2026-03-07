@@ -1,100 +1,146 @@
 import csv
+import logging
+import json
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Dict, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.domain.models import PortfolioPerformance
+
+from app.core.config import settings
+from app.domain.models import PortfolioPerformance, TransactionType
 from app.infrastructure.repositories import TransactionRepository
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Holding:
+    """Холдинг по одному тикеру: количество и средняя цена покупки."""
+
+    quantity: Decimal
+    avg_cost: Decimal
 
 
 class PriceService:
     """Сервис для получения актуальных цен акций из CSV-файла"""
 
-    # Маппинг тикеров на названия компаний из файла
-    TICKER_TO_COMPANY = {
-        "AAPL": "Apple",
-        "MSFT": "Microsoft",
-        "NVDA": "NVIDIA",
-        "AMZN": "Amazon.com",
-        "BA": "Boeing",
-        "CVX": "Chevron",
-        "CAT": "Caterpillar",
-        "DIS": "Walt Disney",
-        "CSCO": "Cisco",
-        "GS": "Goldman Sachs",
-        "JPM": "JPMorgan",
-        "KO": "Coca-Cola",
-        "MCD": "McDonald's",
-        "MRK": "Merck&Co",
-        "MMM": "3M",
-        "WMT": "Walmart",
-        "HD": "Home Depot",
-        "IBM": "IBM",
-        "VZ": "Verizon",
-        "TRV": "The Travelers",
-        "JNJ": "J&J",
-        "AXP": "American Express",
-        "HON": "Honeywell",
-        "CRM": "Salesforce Inc",
-        "V": "Visa A",
-        "UNH": "UnitedHealth",
-        "NKE": "Nike",
-        "PG": "P&G",
-        "SWK": "Sherwin-Williams",
-        "AMGN": "Amgen",
-    }
-
-    def __init__(self, csv_path: str = "data/Американские фондовые рынки.csv"):
-        self.csv_path = Path(csv_path)
+    def __init__(
+            self,
+            csv_path: Optional[str] = None,
+            ticker_map_path: Optional[str] = None
+    ):
+        """
+        :param csv_path: Путь к csv-файлу с ценами. Если не указан, берётся из настроек.
+        :param ticker_map_path: Путь к json-файлу с маппингом тикеров. Если не указан, берётся из настроек.
+        """
+        self.csv_path = Path(csv_path or settings.prices_csv_path)
+        self.ticker_map_path = Path(ticker_map_path or settings.ticker_map_path)
         self._prices: Optional[Dict[str, Decimal]] = None
+        self._ticker_map: Optional[Dict[str, str]] = None
+
+    def _load_ticker_map(self) -> Dict[str, str]:
+        """Загружает маппинг тикеров из json-файла."""
+
+        path = self.ticker_map_path
+        if not path.exists():
+            logger.error("Файл с маппингом тикеров не найден: %s", path)
+            return {}
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    logger.error("Неверный формат json: ожидается словарь")
+                    return {}
+                return {k.upper(): v for k, v in data.items()}
+        except Exception as e:
+            logger.exception("Ошибка загрузки маппинга тикеров из %s", path)
+            return {}
+
+    @property
+    def ticker_map(self) -> Dict[str, str]:
+        """Ленивая загрузка маппинга тикеров."""
+
+        if self._ticker_map is None:
+            self._ticker_map = self._load_ticker_map()
+        return self._ticker_map
 
     def _load_prices(self) -> Dict[str, Decimal]:
-        """Загружает цены из CSV-файла"""
+        """Загружает цены из csv-файла и возвращает словарь {название_компании: цена}."""
+
         prices = {}
         path = self.csv_path
 
         if not path.exists():
-            return prices  # Если файл не найден, возвращаем пустой словарь
+            logger.warning("csv-файл с ценами не найден: %s", path)
+            return prices
 
-        with open(path, 'r', encoding='utf-8-sig', newline='') as f:
-            reader = csv.DictReader(f, delimiter=',')
-            for row in reader:
-                name = row.get('Название', '').strip()
-                price_str = row.get('Послед.', '0').replace(',', '.').strip()
-                try:
-                    prices[name] = Decimal(price_str)
-                except:
-                    continue
+        try:
+            with open(path, 'r', encoding='utf-8-sig', newline='') as f:
+                reader = csv.DictReader(f, delimiter=',')
+                for row in reader:
+                    name = row.get('Название', '').strip()
+                    price_str = row.get('Послед.', '0').replace(',', '.').strip()
+                    if not name or not price_str:
+                        continue
+                    try:
+                        prices[name] = Decimal(price_str)
+                    except Exception as e:
+                        logger.warning("Не удалось распарсить цену для '%s': %s", name, e)
+        except Exception as e:
+            logger.error("Ошибка при чтении csv-файла %s: %s", path, e)
 
         return prices
 
     @property
     def prices(self) -> Dict[str, Decimal]:
-        """Ленивая загрузка цен (кэшируется после первого чтения)"""
+        """Ленивая загрузка цен (кэшируется после первого чтения)."""
+
         if self._prices is None:
             self._prices = self._load_prices()
         return self._prices
 
-    def get_price(self, ticker: str) -> Decimal:
-        """Получает цену по тикуру"""
-        company_name = self.TICKER_TO_COMPANY.get(ticker.upper())
+    def get_price(self, ticker: str) -> Optional[Decimal]:
+        """Возвращает текущую цену для указанного тикера или None, если цена не найдена."""
+        company_name = self.get_company_name(ticker)
         if not company_name:
-            return Decimal(0)
+            logger.debug("Не найден маппинг для тикера %s", ticker)
+            return None
 
-        return self.prices.get(company_name, Decimal(0))
+        price = self.prices.get(company_name)
+        if price is None:
+            logger.debug("Цена для компании '%s' (тикер %s) отсутствует в csv",
+                         company_name, ticker)
+            return None
+
+        return price
+
+    def get_company_name(self, ticker: str) -> Optional[str]:
+        """Возвращает название компании по тикеру или None, если тикер не найден."""
+
+        return self.ticker_map.get(ticker.upper())
+
+
 
 
 class PortfolioService:
     """Сервис для расчёта метрик эффективности инвестиционного портфеля."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, price_service: PriceService):
         self.db = db
-        self.price_service = PriceService()
+        self.price_service = price_service
+        self.repo = TransactionRepository(db)
 
-    async def calculate_performance(self,
-                                    portfolio_id: int) -> PortfolioPerformance:
-        repo = TransactionRepository(self.db)
-        transactions = await repo.get_by_portfolio(portfolio_id)
+    async def calculate_performance(self, portfolio_id: int) -> PortfolioPerformance:
+        """
+        Рассчитывает эффективность портфеля:
+        - total_invested: сумма всех покупок с учётом продаж (по средней цене)
+        - current_value: текущая рыночная стоимость остатка акций
+        - roi_percent: доходность в процентах
+        """
+        transactions = await self.repo.get_by_portfolio(portfolio_id)
 
         if not transactions:
             return PortfolioPerformance(
@@ -104,7 +150,7 @@ class PortfolioService:
                 roi_percent=Decimal(0)
             )
 
-        holdings = {}
+        holdings: Dict[str, Holding] = {}
         total_invested = Decimal(0)
 
         for tx in transactions:
@@ -112,51 +158,61 @@ class PortfolioService:
             qty = Decimal(str(tx.quantity))
             price = Decimal(str(tx.price))
 
-            if tx.transaction_type == "buy":
-                # Обновляем среднюю цену покупки и количество
-                existing_qty = holdings.get(ticker, {}).get("quantity",
-                                                            Decimal(0))
-                existing_cost = holdings.get(ticker, {}).get("avg_cost",
-                                                             Decimal(0))
+            if tx.transaction_type == TransactionType.BUY.value:
+                # Обработка покупки
+                if ticker in holdings:
+                    old = holdings[ticker]
+                    total_cost = (old.quantity * old.avg_cost) + (qty * price)
+                    new_qty = old.quantity + qty
+                    avg_cost = total_cost / new_qty if new_qty > 0 else Decimal(0)
+                    holdings[ticker] = Holding(new_qty, avg_cost)
+                else:
+                    holdings[ticker] = Holding(qty, price)
 
-                total_cost = (existing_qty * existing_cost) + (qty * price)
-                total_qty = existing_qty + qty
-                avg_cost = total_cost / total_qty if total_qty > 0 else Decimal(
-                    0)
-
-                holdings[ticker] = {"quantity": total_qty, "avg_cost": avg_cost}
                 total_invested += qty * price
 
-            elif tx.transaction_type == "sell":
-                # Продажа: уменьшаем количество
-                holding = holdings.get(ticker)
-                if not holding or holding["quantity"] < qty:
+            elif tx.transaction_type == TransactionType.SELL.value:
+                # Обработка продажи
+                if ticker not in holdings or holdings[ticker].quantity < qty:
+                    logger.warning(
+                        "Попытка продать %s акций %s, но в портфеле только %s",
+                        qty, ticker, holdings.get(ticker, Holding(Decimal(0), Decimal(0))).quantity
+                    )
                     continue
 
-                holding["quantity"] -= qty
-                total_invested -= qty * holding["avg_cost"]
+                holding = holdings[ticker]
+                holding.quantity -= qty
+                total_invested -= qty * holding.avg_cost
 
-                if holding["quantity"] <= 0:
+                if holding.quantity == 0:
                     del holdings[ticker]
 
-        # Считаем текущую стоимость с ценами из файла
+        # Расчёт текущей стоимости
         current_value = Decimal(0)
-        for ticker, data in holdings.items():
-            current_price = self.price_service.get_price(ticker)
-            current_value += data["quantity"] * current_price
+        missing_prices = []
 
-        # Расчёт
-        roi_percent = ((
-                                   current_value - total_invested) / total_invested * 100) if total_invested > 0 else Decimal(
-            0)
+        for ticker, holding in holdings.items():
+            price = self.price_service.get_price(ticker)
+            if price is not None:
+                current_value += holding.quantity * price
+            else:
+                missing_prices.append(ticker)
 
-        total_invested = total_invested.quantize(Decimal('0.001'))
-        current_value = current_value.quantize(Decimal('0.001'))
-        roi_percent = roi_percent.quantize(Decimal('0.001'))
+        if missing_prices:
+            logger.warning(
+                "Для следующих тикеров не найдены текущие цены: %s",
+                ", ".join(missing_prices)
+            )
+
+        # Расчёт доходности
+        if total_invested > 0:
+            roi = (current_value - total_invested) / total_invested * 100
+        else:
+            roi = Decimal(0)
 
         return PortfolioPerformance(
             portfolio_id=portfolio_id,
             total_invested=total_invested,
             current_value=current_value,
-            roi_percent=roi_percent
+            roi_percent=roi
         )

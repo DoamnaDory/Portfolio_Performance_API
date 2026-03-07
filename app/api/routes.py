@@ -8,12 +8,18 @@ from app.domain.models import (
     PortfolioResponse,
     TransactionResponse
 )
-from app.domain.services import PortfolioService
+from app.domain.services import PortfolioService, PriceService
 from app.infrastructure.repositories import TransactionRepository, \
     PortfolioRepository
 from typing import List
+from functools import lru_cache
 
 router = APIRouter(prefix="/api/v1")
+
+
+@lru_cache(maxsize=1)
+def get_price_service() -> PriceService:
+    return PriceService()
 
 
 # Портфели
@@ -167,21 +173,11 @@ async def get_transactions(
 )
 async def get_portfolio_performance(
         portfolio_id: int,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_db),
+        price_service: PriceService = Depends(get_price_service)
 ):
-    """
-    Рассчитать метрики эффективности портфеля.
-
-    - **portfolio_id**: Уникальный идентификатор портфеля
-    """
-    portfolio_repo = PortfolioRepository(db)
-    portfolio = await portfolio_repo.get_portfolio(portfolio_id)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
-    service = PortfolioService(db)
+    service = PortfolioService(db, price_service)
     result = await service.calculate_performance(portfolio_id)
-
     return result
 
 
