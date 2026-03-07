@@ -9,7 +9,7 @@ echo "Waiting for PostgreSQL at $host:$port..."
 
 for i in $(seq $timeout); do
   if nc -z "$host" "$port" 2>/dev/null; then
-    echo "Postgres is up - executing command"
+    echo "PostgreSQL is up - executing migrations"
     break
   fi
   echo "Waiting for PostgreSQL... ($i/$timeout)"
@@ -21,5 +21,9 @@ if ! nc -z "$host" "$port" 2>/dev/null; then
   exit 1
 fi
 
+echo "Running database migrations..."
+alembic upgrade head
+
+echo "Migrations completed successfully"
 echo "Starting application..."
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
