@@ -4,7 +4,9 @@ from typing import Optional
 
 
 class Settings(BaseSettings):
-    """Настройки приложения"""
+    """
+    Настройки приложения.
+    """
 
     db_host: str = Field("localhost", validation_alias="DB_HOST")
     db_port: int = Field(5432, validation_alias="DB_PORT", ge=1, le=65535)
@@ -33,7 +35,9 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Формирует URL для подключения к БД"""
+        """
+        Формирует URL для подключения к БД.
+        """
         return (
             f"postgresql+asyncpg://{self.db_user}:{self.db_password.get_secret_value()}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"

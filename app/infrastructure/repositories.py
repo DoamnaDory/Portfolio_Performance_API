@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.future import select
 from app.infrastructure.models_orm import Portfolio, Transaction
 from app.domain.models import TransactionCreate, PortfolioCreate
@@ -44,7 +44,9 @@ class TransactionRepository:
         self.db = db
 
     async def add_transaction(self, tx: TransactionCreate) -> Transaction:
-        """Добавить транзакцию для указанного портфеля."""
+        """
+        Добавить транзакцию для указанного портфеля.
+        """
 
         data = tx.model_dump()
 
@@ -62,7 +64,9 @@ class TransactionRepository:
         return db_tx
 
     async def get_by_portfolio(self, portfolio_id: int) -> List[Transaction]:
-        """Возвращает все транзакции для указанного портфеля."""
+        """
+        Возвращает все транзакции для указанного портфеля.
+        """
 
         result = await self.db.execute(
             select(Transaction).where(Transaction.portfolio_id == portfolio_id)

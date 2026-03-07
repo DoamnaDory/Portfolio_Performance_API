@@ -7,14 +7,18 @@ from typing import Optional
 
 
 class TransactionType(str, Enum):
-    """Тип транзакции: покупка или продажа."""
+    """
+    Тип транзакции: покупка или продажа.
+    """
 
     BUY = "buy"
     SELL = "sell"
 
 
 class PortfolioCreate(BaseModel):
-    """Создание нового портфеля"""
+    """
+    Создание нового портфеля
+    """
 
     name: str = Field(
         ...,
@@ -29,12 +33,16 @@ class PortfolioResponse(BaseModel):
     id: int
     name: str
     created_at: datetime
+    transaction_count: int = Field(...,
+                                   description="Количество транзакций в портфеле")
 
     model_config = {'from_attributes': True}
 
 
 class TransactionCreate(BaseModel):
-    """Создание новой транзакции"""
+    """
+    Создание новой транзакции
+    """
 
     portfolio_id: int
     ticker: str = Field(
@@ -55,7 +63,9 @@ class TransactionCreate(BaseModel):
     @field_validator("transaction_date", mode="before")
     @classmethod
     def set_default_date(cls, v: Optional[datetime]) -> datetime:
-        """Если дата не передана, устанавливаем текущую UTC."""
+        """
+        Если дата не передана, устанавливаем текущую UTC.
+        """
 
         return v or datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -73,11 +83,13 @@ class TransactionResponse(BaseModel):
 
     @field_serializer('quantity', 'price')
     def serialize_decimal(self, value: Decimal) -> str:
-        return str(value)
+        return str(value.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP))
 
 
 class PortfolioPerformance(BaseModel):
-    """Вычисление метрик для портфеля"""
+    """
+    Вычисление метрик для портфеля
+    """
 
     portfolio_id: int
     total_invested: Decimal = Field(

@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Holding:
-    """Холдинг по одному тикеру: количество и средняя цена покупки."""
+    """
+    Холдинг по одному тикеру: количество и средняя цена покупки.
+    """
 
     quantity: Decimal
     avg_cost: Decimal
@@ -75,7 +77,8 @@ class PriceService:
         return self._ticker_map
 
     def _load_prices(self) -> Dict[str, Decimal]:
-        """Загружает цены из csv-файла и возвращает словарь {название_компании: цена}.
+        """
+        Загружает цены из csv-файла и возвращает словарь {название_компании: цена}.
         """
 
         prices = {}
@@ -105,7 +108,9 @@ class PriceService:
 
     @property
     def prices(self) -> Dict[str, Decimal]:
-        """Ленивая загрузка цен (кэшируется после первого чтения)."""
+        """
+        Ленивая загрузка цен (кэшируется после первого чтения).
+        """
 
         if self._prices is None:
             self._prices = self._load_prices()

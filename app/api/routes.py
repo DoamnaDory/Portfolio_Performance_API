@@ -177,7 +177,6 @@ async def get_portfolio_performance(
     return result
 
 
-# Main
 @router.get("/", tags=["Main"])
 async def root():
     """

@@ -33,7 +33,9 @@ BUY_SELL_RATIO = 0.8
 
 
 def load_ticker_map() -> dict:
-    """Загружает маппинг тикеров из json-файла, указанного в настройках."""
+    """
+    Загружает маппинг тикеров из json-файла, указанного в настройках.
+    """
 
     path = Path(settings.ticker_map_path)
     if not path.exists():
