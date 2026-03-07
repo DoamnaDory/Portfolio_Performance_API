@@ -1,7 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict, \
+    field_serializer
 from typing import Optional
 
 
@@ -29,8 +30,7 @@ class PortfolioResponse(BaseModel):
     name: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {'from_attributes': True}
 
 
 class TransactionCreate(BaseModel):
@@ -69,11 +69,11 @@ class TransactionResponse(BaseModel):
     transaction_type: TransactionType
     transaction_date: datetime
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            Decimal: lambda v: str(v)
-        }
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer('quantity', 'price')
+    def serialize_decimal(self, value: Decimal) -> str:
+        return str(value)
 
 
 class PortfolioPerformance(BaseModel):
@@ -90,8 +90,8 @@ class PortfolioPerformance(BaseModel):
         ..., description="Доходность в процентах"
     )
 
-    class Config:
-        json_encoders = {
-            Decimal: lambda v: str(v.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP))
-        }
+    model_config = ConfigDict()
 
+    @field_serializer('total_invested', 'current_value', 'roi_percent')
+    def serialize_decimal(self, value: Decimal) -> str:
+        return str(value.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP))
