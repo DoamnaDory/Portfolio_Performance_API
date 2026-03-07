@@ -44,7 +44,7 @@ class TransactionRepository:
         self.db = db
 
     async def add_transaction(self, tx: TransactionCreate) -> Transaction:
-        """Добавить транзакцию  для указанного портфеля."""
+        """Добавить транзакцию для указанного портфеля."""
 
         data = tx.model_dump()
 

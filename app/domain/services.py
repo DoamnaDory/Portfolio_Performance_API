@@ -4,13 +4,14 @@ import json
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Optional
-
+from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.domain.models import PortfolioPerformance, TransactionType
-from app.infrastructure.repositories import TransactionRepository
+from app.infrastructure.models_orm import Portfolio, Transaction
+from app.infrastructure.repositories import TransactionRepository, \
+    PortfolioRepository
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,9 @@ class Holding:
 
 
 class PriceService:
-    """Сервис для получения актуальных цен акций из CSV-файла"""
+    """
+    Сервис для получения актуальных цен акций из csv-файла
+    """
 
     def __init__(
             self,
@@ -41,7 +44,9 @@ class PriceService:
         self._ticker_map: Optional[Dict[str, str]] = None
 
     def _load_ticker_map(self) -> Dict[str, str]:
-        """Загружает маппинг тикеров из json-файла."""
+        """
+        Загружает маппинг тикеров из json-файла.
+        """
 
         path = self.ticker_map_path
         if not path.exists():
@@ -61,14 +66,17 @@ class PriceService:
 
     @property
     def ticker_map(self) -> Dict[str, str]:
-        """Ленивая загрузка маппинга тикеров."""
+        """
+        Ленивая загрузка маппинга тикеров.
+        """
 
         if self._ticker_map is None:
             self._ticker_map = self._load_ticker_map()
         return self._ticker_map
 
     def _load_prices(self) -> Dict[str, Decimal]:
-        """Загружает цены из csv-файла и возвращает словарь {название_компании: цена}."""
+        """Загружает цены из csv-файла и возвращает словарь {название_компании: цена}.
+        """
 
         prices = {}
         path = self.csv_path
@@ -88,7 +96,8 @@ class PriceService:
                     try:
                         prices[name] = Decimal(price_str)
                     except Exception as e:
-                        logger.warning("Не удалось распарсить цену для '%s': %s", name, e)
+                        logger.warning("Не удалось распарсить цену для '%s': %s",
+                                       name, e)
         except Exception as e:
             logger.error("Ошибка при чтении csv-файла %s: %s", path, e)
 
@@ -103,7 +112,8 @@ class PriceService:
         return self._prices
 
     def get_price(self, ticker: str) -> Optional[Decimal]:
-        """Возвращает текущую цену для указанного тикера или None, если цена не найдена."""
+        """
+        Возвращает текущую цену для указанного тикера или None, если цена не найдена."""
         company_name = self.get_company_name(ticker)
         if not company_name:
             logger.debug("Не найден маппинг для тикера %s", ticker)
@@ -118,29 +128,59 @@ class PriceService:
         return price
 
     def get_company_name(self, ticker: str) -> Optional[str]:
-        """Возвращает название компании по тикеру или None, если тикер не найден."""
-
+        """
+        Возвращает название компании по тикеру или None, если тикер не найден.
+        """
         return self.ticker_map.get(ticker.upper())
 
 
-
-
 class PortfolioService:
-    """Сервис для расчёта метрик эффективности инвестиционного портфеля."""
+    """
+    Сервис для расчёта метрик эффективности инвестиционного портфеля и CRUD операций с портфелями."""
 
-    def __init__(self, db: AsyncSession, price_service: PriceService):
+    def __init__(self, db: AsyncSession,
+                 price_service: Optional[PriceService] = None):
         self.db = db
+        self.transaction_repo = TransactionRepository(db)
+        self.portfolio_repo = PortfolioRepository(db)
         self.price_service = price_service
-        self.repo = TransactionRepository(db)
 
-    async def calculate_performance(self, portfolio_id: int) -> PortfolioPerformance:
+    async def create_portfolio(self, portfolio_data) -> Portfolio:
+        db_portfolio = await self.portfolio_repo.create_portfolio(portfolio_data)
+        return db_portfolio
+
+    async def get_portfolio(self, portfolio_id: int) -> Optional[Portfolio]:
+        return await self.portfolio_repo.get_portfolio(portfolio_id)
+
+    async def get_all_portfolios(self) -> List[Portfolio]:
+        return await self.portfolio_repo.get_all_portfolios()
+
+    async def delete_portfolio(self, portfolio_id: int) -> bool:
+        return await self.portfolio_repo.delete_portfolio(portfolio_id)
+
+    async def add_transaction(self, transaction_data)  -> Transaction:
+        """
+        Добавляет транзакцию через репозиторий.
+        """
+        return await self.transaction_repo.add_transaction(transaction_data)
+
+    async def get_transactions_for_portfolio(self, portfolio_id: int) -> List[Transaction]:
+        """
+        Получает транзакции для портфеля через репозиторий.
+        """
+        return await self.transaction_repo.get_by_portfolio(portfolio_id)
+
+    async def calculate_performance(self,
+                                    portfolio_id: int) -> PortfolioPerformance:
         """
         Рассчитывает эффективность портфеля:
         - total_invested: сумма всех покупок с учётом продаж (по средней цене)
         - current_value: текущая рыночная стоимость остатка акций
         - roi_percent: доходность в процентах
         """
-        transactions = await self.repo.get_by_portfolio(portfolio_id)
+        portfolio_exists = await self.get_portfolio(portfolio_id)
+
+        transactions = await self.transaction_repo.get_by_portfolio(portfolio_id)
 
         if not transactions:
             return PortfolioPerformance(
@@ -164,7 +204,8 @@ class PortfolioService:
                     old = holdings[ticker]
                     total_cost = (old.quantity * old.avg_cost) + (qty * price)
                     new_qty = old.quantity + qty
-                    avg_cost = total_cost / new_qty if new_qty > 0 else Decimal(0)
+                    avg_cost = total_cost / new_qty if new_qty > 0 else Decimal(
+                        0)
                     holdings[ticker] = Holding(new_qty, avg_cost)
                 else:
                     holdings[ticker] = Holding(qty, price)
@@ -175,8 +216,10 @@ class PortfolioService:
                 # Обработка продажи
                 if ticker not in holdings or holdings[ticker].quantity < qty:
                     logger.warning(
-                        "Попытка продать %s акций %s, но в портфеле только %s",
-                        qty, ticker, holdings.get(ticker, Holding(Decimal(0), Decimal(0))).quantity
+                        "Попытка продать %s акций %s, но в портфеле только %s ",
+                        qty, ticker, holdings.get(ticker, Holding(Decimal(0),
+                                                                  Decimal(
+                                                                      0))).quantity
                     )
                     continue
 
@@ -192,15 +235,19 @@ class PortfolioService:
         missing_prices = []
 
         for ticker, holding in holdings.items():
-            price = self.price_service.get_price(ticker)
-            if price is not None:
-                current_value += holding.quantity * price
+            if self.price_service:
+                price = self.price_service.get_price(ticker)
+                if price is not None:
+                    current_value += holding.quantity * price
+                else:
+                    missing_prices.append(ticker)
             else:
-                missing_prices.append(ticker)
+                logger.warning(
+                    "PriceService не предоставлен, невозможно рассчитать текущую стоимость.")
 
         if missing_prices:
             logger.warning(
-                "Для следующих тикеров не найдены текущие цены: %s",
+                "Для следующих тикеров не найдены текущие цены: %s ",
                 ", ".join(missing_prices)
             )
 

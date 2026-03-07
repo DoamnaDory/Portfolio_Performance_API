@@ -22,7 +22,13 @@ def get_price_service() -> PriceService:
     return PriceService()
 
 
-# Портфели
+# Единая функция-зависимость для получения PortfolioService
+def get_portfolio_service(db: AsyncSession = Depends(get_db),
+                          price_service: PriceService = Depends(
+                              get_price_service)):
+    return PortfolioService(db, price_service)
+
+
 @router.post(
     "/portfolios/",
     response_model=PortfolioResponse,
@@ -33,15 +39,14 @@ def get_price_service() -> PriceService:
 )
 async def create_portfolio(
         portfolio: PortfolioCreate,
-        db: AsyncSession = Depends(get_db)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
     """
     Создать новый портфель.
 
     - **name**: Название портфеля (например, 'Мои многомиллионные акции')
     """
-    repo = PortfolioRepository(db)
-    return await repo.create_portfolio(portfolio)
+    return await service.create_portfolio(portfolio)
 
 
 @router.get(
@@ -51,12 +56,14 @@ async def create_portfolio(
     description="Возвращает список всех созданных инвестиционных портфелей.",
     tags=["Портфели"]
 )
-async def get_portfolios(db: AsyncSession = Depends(get_db)):
+async def get_portfolios(
+        service: PortfolioService = Depends(get_portfolio_service)
+):
     """
     Получить список всех портфелей.
     """
-    repo = PortfolioRepository(db)
-    return await repo.get_all_portfolios()
+
+    return await service.get_all_portfolios()
 
 
 @router.get(
@@ -68,15 +75,14 @@ async def get_portfolios(db: AsyncSession = Depends(get_db)):
 )
 async def get_portfolio(
         portfolio_id: int,
-        db: AsyncSession = Depends(get_db)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
     """
     Получить детали портфеля по ID.
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    repo = PortfolioRepository(db)
-    portfolio = await repo.get_portfolio(portfolio_id)
+    portfolio = await service.get_portfolio(portfolio_id)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
     return portfolio
@@ -91,21 +97,18 @@ async def get_portfolio(
 )
 async def delete_portfolio(
         portfolio_id: int,
-        db: AsyncSession = Depends(get_db)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
     """
     Удалить портфель по ID.
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    repo = PortfolioRepository(db)
-    deleted = await repo.delete_portfolio(portfolio_id)
+    deleted = await service.delete_portfolio(portfolio_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Портфель не найден")
-    return
 
 
-# Транзакции
 @router.post(
     "/transactions/",
     response_model=dict,
@@ -116,7 +119,7 @@ async def delete_portfolio(
 )
 async def add_transaction(
         transaction: TransactionCreate,
-        db: AsyncSession = Depends(get_db)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
     """
     Добавить новую транзакцию (покупка/продажа).
@@ -127,13 +130,11 @@ async def add_transaction(
     - **price**: Цена за акцию
     - **transaction_type**: 'buy' или 'sell'
     """
-    portfolio_repo = PortfolioRepository(db)
-    portfolio = await portfolio_repo.get_portfolio(transaction.portfolio_id)
+    portfolio = await service.get_portfolio(transaction.portfolio_id)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
 
-    repo = TransactionRepository(db)
-    await repo.add_transaction(transaction)
+    await service.add_transaction(transaction)  # Вызываем метод сервиса
     return {"message": "Транзакция успешно добавлена",
             "portfolio_id": transaction.portfolio_id}
 
@@ -147,23 +148,20 @@ async def add_transaction(
 )
 async def get_transactions(
         portfolio_id: int,
-        db: AsyncSession = Depends(get_db)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
     """
     Получить историю транзакций для портфеля.
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    portfolio_repo = PortfolioRepository(db)
-    portfolio = await portfolio_repo.get_portfolio(portfolio_id)
+    portfolio = await service.get_portfolio(portfolio_id)
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
 
-    repo = TransactionRepository(db)
-    return await repo.get_by_portfolio(portfolio_id)
+    return await service.get_transactions_for_portfolio(portfolio_id)
 
 
-# Метрики
 @router.get(
     "/portfolios/{portfolio_id}/performance",
     response_model=PortfolioPerformance,
@@ -173,10 +171,8 @@ async def get_transactions(
 )
 async def get_portfolio_performance(
         portfolio_id: int,
-        db: AsyncSession = Depends(get_db),
-        price_service: PriceService = Depends(get_price_service)
+        service: PortfolioService = Depends(get_portfolio_service)
 ):
-    service = PortfolioService(db, price_service)
     result = await service.calculate_performance(portfolio_id)
     return result
 

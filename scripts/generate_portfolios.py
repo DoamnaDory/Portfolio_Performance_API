@@ -33,7 +33,7 @@ BUY_SELL_RATIO = 0.8
 
 
 def load_ticker_map() -> dict:
-    """Загружает маппинг тикеров из JSON-файла, указанного в настройках."""
+    """Загружает маппинг тикеров из json-файла, указанного в настройках."""
 
     path = Path(settings.ticker_map_path)
     if not path.exists():
@@ -51,7 +51,7 @@ def load_ticker_map() -> dict:
 
 def load_prices_from_csv(csv_path: Path) -> dict:
     """
-    Загружает цены из CSV-файла.
+    Загружает цены из csv-файла.
     Возвращает словарь {название_компании: Decimal(цена)}.
     """
 

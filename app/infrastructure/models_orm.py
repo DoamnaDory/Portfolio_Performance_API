@@ -15,7 +15,11 @@ class Portfolio(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
-    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
+    portfolio_id = Column(
+        Integer,
+        ForeignKey("portfolios.id", ondelete='CASCADE'),
+        nullable=False
+    )
     ticker = Column(String, nullable=False)
     quantity = Column(Numeric(18, 8), nullable=False)
     price = Column(Numeric(18, 8), nullable=False)
