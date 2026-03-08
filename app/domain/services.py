@@ -17,6 +17,14 @@ from app.infrastructure.repositories import TransactionRepository, \
 logger = logging.getLogger(__name__)
 
 
+class PortfolioNotFoundError(Exception):
+    """Выбрасывается, когда портфель с указанным ID не найден."""
+
+    def __init__(self, portfolio_id: int):
+        self.portfolio_id = portfolio_id
+        super().__init__(f"Портфель с id {portfolio_id} не найден")
+
+
 @dataclass
 class Holding:
     """Холдинг по одному тикеру: количество и средняя цена покупки."""
@@ -147,7 +155,7 @@ class PortfolioService:
         portfolio_with_count = await self.portfolio_repo.get_portfolio_with_transaction_count(
             portfolio_id)
         if not portfolio_with_count:
-            return None
+            raise PortfolioNotFoundError(portfolio_id)
 
         portfolio, count = portfolio_with_count
         portfolio_data = {
@@ -171,20 +179,36 @@ class PortfolioService:
             result.append(PortfolioResponse.model_validate(portfolio_data))
         return result
 
-    async def delete_portfolio(self, portfolio_id: int) -> bool:
-        return await self.portfolio_repo.delete_portfolio(portfolio_id)
+    async def delete_portfolio(self, portfolio_id: int) -> None:
+        portfolio = await self.portfolio_repo.get_portfolio_with_transaction_count(
+            portfolio_id)
+        if not portfolio:
+            raise PortfolioNotFoundError(portfolio_id)
 
-    async def add_transaction(self, transaction_data)  -> Transaction:
+        await self.portfolio_repo.delete_portfolio(portfolio_id)
+
+    async def add_transaction(self, transaction_data) -> Transaction:
         """Добавляет транзакцию через репозиторий."""
+        portfolio = await self.portfolio_repo.get_portfolio_with_transaction_count(
+            transaction_data.portfolio_id)
+        if not portfolio:
+            raise PortfolioNotFoundError(transaction_data.portfolio_id)
+
         return await self.transaction_repo.add_transaction(transaction_data)
 
     async def get_portfolio_transactions(self, portfolio_id: int) -> List[
         TransactionResponse]:
         """Возвращает транзакции портфеля по ID."""
+        portfolio = await self.portfolio_repo.get_portfolio_with_transaction_count(
+            portfolio_id)
+        if not portfolio:
+            raise PortfolioNotFoundError(portfolio_id)
+
         transactions = await self.transaction_repo.get_by_portfolio(portfolio_id)
         return [TransactionResponse.model_validate(t) for t in transactions]
 
-    async def get_transactions_for_portfolio(self, portfolio_id: int) -> List[Transaction]:
+    async def get_transactions_for_portfolio(self, portfolio_id: int) -> List[
+        Transaction]:
         """
         Получает транзакции для портфеля через репозиторий.
         """
@@ -198,7 +222,10 @@ class PortfolioService:
         - current_value: текущая рыночная стоимость остатка акций
         - roi_percent: доходность в процентах
         """
-        portfolio_exists = await self.get_portfolio(portfolio_id)
+        portfolio = await self.portfolio_repo.get_portfolio_with_transaction_count(
+            portfolio_id)
+        if not portfolio:
+            raise PortfolioNotFoundError(portfolio_id)
 
         transactions = await self.transaction_repo.get_by_portfolio(portfolio_id)
 

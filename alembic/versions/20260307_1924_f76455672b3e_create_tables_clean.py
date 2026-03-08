@@ -19,7 +19,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Создаём таблицу portfolios
     op.create_table('portfolios',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(), nullable=False),
@@ -28,7 +27,6 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_portfolios_id'), 'portfolios', ['id'], unique=False)
 
-    # Создаём таблицу transactions
     op.create_table('transactions',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('portfolio_id', sa.Integer(), nullable=False),
@@ -43,7 +41,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_transactions_id'), 'transactions', ['id'], unique=False)
 
 def downgrade() -> None:
-    # Удаляем в обратном порядке
     op.drop_index(op.f('ix_transactions_id'), table_name='transactions')
     op.drop_table('transactions')
     op.drop_index(op.f('ix_portfolios_id'), table_name='portfolios')

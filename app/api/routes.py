@@ -8,7 +8,8 @@ from app.domain.models import (
     PortfolioResponse,
     TransactionResponse
 )
-from app.domain.services import PortfolioService, PriceService
+from app.domain.services import PortfolioService, PriceService, \
+    PortfolioNotFoundError
 from typing import List
 from functools import lru_cache
 
@@ -76,10 +77,7 @@ async def get_portfolio(
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    portfolio = await service.get_portfolio(portfolio_id)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-    return portfolio
+    return await service.get_portfolio(portfolio_id)
 
 
 @router.delete(
@@ -98,9 +96,7 @@ async def delete_portfolio(
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    deleted = await service.delete_portfolio(portfolio_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
+    await service.delete_portfolio(portfolio_id)
 
 
 @router.post(
@@ -124,11 +120,7 @@ async def add_transaction(
     - **price**: Цена за акцию
     - **transaction_type**: 'buy' или 'sell'
     """
-    portfolio = await service.get_portfolio(transaction.portfolio_id)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
-    await service.add_transaction(transaction)  # Вызываем метод сервиса
+    await service.add_transaction(transaction)
     return {"message": "Транзакция успешно добавлена",
             "portfolio_id": transaction.portfolio_id}
 
@@ -149,10 +141,6 @@ async def get_transactions(
 
     - **portfolio_id**: Уникальный идентификатор портфеля
     """
-    portfolio = await service.get_portfolio(portfolio_id)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
     return await service.get_portfolio_transactions(portfolio_id)
 
 
@@ -167,12 +155,7 @@ async def get_portfolio_performance(
         portfolio_id: int,
         service: PortfolioService = Depends(get_portfolio_service)
 ):
-    portfolio = await service.get_portfolio(portfolio_id)
-    if not portfolio:
-        raise HTTPException(status_code=404, detail="Портфель не найден")
-
-    result = await service.calculate_performance(portfolio_id)
-    return result
+    return await service.calculate_performance(portfolio_id)
 
 
 @router.get("/", tags=["Main"])
