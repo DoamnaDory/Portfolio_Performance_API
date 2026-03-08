@@ -167,6 +167,10 @@ async def get_portfolio_performance(
         portfolio_id: int,
         service: PortfolioService = Depends(get_portfolio_service)
 ):
+    portfolio = await service.get_portfolio(portfolio_id)
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Портфель не найден")
+
     result = await service.calculate_performance(portfolio_id)
     return result
 

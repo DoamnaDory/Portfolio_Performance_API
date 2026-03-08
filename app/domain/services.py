@@ -178,6 +178,12 @@ class PortfolioService:
         """Добавляет транзакцию через репозиторий."""
         return await self.transaction_repo.add_transaction(transaction_data)
 
+    async def get_portfolio_transactions(self, portfolio_id: int) -> List[
+        TransactionResponse]:
+        """Возвращает транзакции портфеля по ID."""
+        transactions = await self.transaction_repo.get_by_portfolio(portfolio_id)
+        return [TransactionResponse.model_validate(t) for t in transactions]
+
     async def get_transactions_for_portfolio(self, portfolio_id: int) -> List[Transaction]:
         """
         Получает транзакции для портфеля через репозиторий.
