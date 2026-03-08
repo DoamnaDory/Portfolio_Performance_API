@@ -33,10 +33,7 @@ BUY_SELL_RATIO = 0.8
 
 
 def load_ticker_map() -> dict:
-    """
-    Загружает маппинг тикеров из json-файла, указанного в настройках.
-    """
-
+    """Загружает маппинг тикеров из json-файла, указанного в настройках."""
     path = Path(settings.ticker_map_path)
     if not path.exists():
         logger.error(f"Файл маппинга тикеров не найден: {path}")
@@ -52,11 +49,7 @@ def load_ticker_map() -> dict:
 
 
 def load_prices_from_csv(csv_path: Path) -> dict:
-    """
-    Загружает цены из csv-файла.
-    Возвращает словарь {название_компании: Decimal(цена)}.
-    """
-
+    """Загружает цены из csv-файла. Возвращает словарь {название_компании: цена}."""
     prices = {}
     if not csv_path.exists():
         logger.warning(
@@ -92,10 +85,7 @@ async def create_random_transactions(
         prices: dict,
         num_transactions: int
 ):
-    """
-    Создаёт случайные транзакции для портфеля, используя предоставленные маппинг и цены.
-    """
-
+    """Создаёт случайные транзакции для портфеля, используя предоставленные маппинг и цены."""
     repo = TransactionRepository(db)
     holdings = {}  # ticker: quantity
 
@@ -152,11 +142,7 @@ async def generate_portfolios(
         transactions_per_portfolio: int,
         clear_existing: bool
 ):
-    """
-    Основная функция генерации портфелей и транзакций.
-    """
-
-    # Загружаем данные один раз
+    """Основная функция генерации портфелей и транзакций."""
     ticker_map = load_ticker_map()
     if not ticker_map:
         logger.error("Не удалось загрузить маппинг тикеров. Завершение.")

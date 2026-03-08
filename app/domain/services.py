@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.domain.models import PortfolioPerformance, TransactionType, \
-    PortfolioResponse, PortfolioCreate
+    PortfolioResponse, PortfolioCreate, TransactionResponse, TransactionCreate
 from app.infrastructure.models_orm import Portfolio, Transaction
 from app.infrastructure.repositories import TransactionRepository, \
     PortfolioRepository
@@ -19,18 +19,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Holding:
-    """
-    Холдинг по одному тикеру: количество и средняя цена покупки.
-    """
-
+    """Холдинг по одному тикеру: количество и средняя цена покупки."""
     quantity: Decimal
     avg_cost: Decimal
 
 
 class PriceService:
-    """
-    Сервис для получения актуальных цен акций из csv-файла
-    """
+    """Сервис для получения актуальных цен акций из csv-файла"""
 
     def __init__(
             self,
@@ -47,10 +42,7 @@ class PriceService:
         self._ticker_map: Optional[Dict[str, str]] = None
 
     def _load_ticker_map(self) -> Dict[str, str]:
-        """
-        Загружает маппинг тикеров из json-файла.
-        """
-
+        """Загружает маппинг тикеров из json-файла."""
         path = self.ticker_map_path
         if not path.exists():
             logger.error("Файл с маппингом тикеров не найден: %s", path)
@@ -69,19 +61,13 @@ class PriceService:
 
     @property
     def ticker_map(self) -> Dict[str, str]:
-        """
-        Ленивая загрузка маппинга тикеров.
-        """
-
+        """Ленивая загрузка маппинга тикеров."""
         if self._ticker_map is None:
             self._ticker_map = self._load_ticker_map()
         return self._ticker_map
 
     def _load_prices(self) -> Dict[str, Decimal]:
-        """
-        Загружает цены из csv-файла и возвращает словарь {название_компании: цена}.
-        """
-
+        """Загружает цены из csv-файла и возвращает словарь {название_компании: цена}."""
         prices = {}
         path = self.csv_path
 
@@ -109,17 +95,13 @@ class PriceService:
 
     @property
     def prices(self) -> Dict[str, Decimal]:
-        """
-        Ленивая загрузка цен (кэшируется после первого чтения).
-        """
-
+        """Ленивая загрузка цен (кэшируется после первого чтения)."""
         if self._prices is None:
             self._prices = self._load_prices()
         return self._prices
 
     def get_price(self, ticker: str) -> Optional[Decimal]:
-        """
-        Возвращает текущую цену для указанного тикера или None, если цена не найдена."""
+        """Возвращает текущую цену для указанного тикера или None, если цена не найдена."""
         company_name = self.get_company_name(ticker)
         if not company_name:
             logger.debug("Не найден маппинг для тикера %s", ticker)
@@ -134,15 +116,12 @@ class PriceService:
         return price
 
     def get_company_name(self, ticker: str) -> Optional[str]:
-        """
-        Возвращает название компании по тикеру или None, если тикер не найден.
-        """
+        """Возвращает название компании по тикеру или None, если тикер не найден."""
         return self.ticker_map.get(ticker.upper())
 
 
 class PortfolioService:
-    """
-    Сервис для расчёта метрик эффективности инвестиционного портфеля и crud операций с портфелями."""
+    """Сервис для расчёта метрик эффективности инвестиционного портфеля и crud операций с портфелями."""
 
     def __init__(self, db: AsyncSession,
                  price_service: Optional[PriceService] = None):
@@ -169,6 +148,7 @@ class PortfolioService:
             portfolio_id)
         if not portfolio_with_count:
             return None
+
         portfolio, count = portfolio_with_count
         portfolio_data = {
             "id": portfolio.id,
@@ -195,9 +175,7 @@ class PortfolioService:
         return await self.portfolio_repo.delete_portfolio(portfolio_id)
 
     async def add_transaction(self, transaction_data)  -> Transaction:
-        """
-        Добавляет транзакцию через репозиторий.
-        """
+        """Добавляет транзакцию через репозиторий."""
         return await self.transaction_repo.add_transaction(transaction_data)
 
     async def get_transactions_for_portfolio(self, portfolio_id: int) -> List[Transaction]:

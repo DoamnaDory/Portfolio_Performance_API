@@ -24,10 +24,6 @@ class PortfolioRepository:
         )
         return result.scalars().first()
 
-    async def get_all_portfolios(self) -> List[Portfolio]:
-        result = await self.db.execute(select(Portfolio))
-        return result.scalars().all()
-
     async def get_portfolio_with_transaction_count(self, portfolio_id: int) -> \
     Optional[tuple[Portfolio, int]]:
         result = await self.db.execute(
@@ -66,9 +62,7 @@ class TransactionRepository:
         self.db = db
 
     async def add_transaction(self, tx: TransactionCreate) -> Transaction:
-        """
-        Добавить транзакцию для указанного портфеля.
-        """
+        """Добавить транзакцию для указанного портфеля."""
 
         data = tx.model_dump()
 
@@ -86,10 +80,7 @@ class TransactionRepository:
         return db_tx
 
     async def get_by_portfolio(self, portfolio_id: int) -> List[Transaction]:
-        """
-        Возвращает все транзакции для указанного портфеля.
-        """
-
+        """Возвращает все транзакции для указанного портфеля."""
         result = await self.db.execute(
             select(Transaction).where(Transaction.portfolio_id == portfolio_id)
         )

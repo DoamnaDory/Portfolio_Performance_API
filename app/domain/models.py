@@ -7,19 +7,13 @@ from typing import Optional
 
 
 class TransactionType(str, Enum):
-    """
-    Тип транзакции: покупка или продажа.
-    """
-
+    """Тип транзакции: покупка или продажа."""
     BUY = "buy"
     SELL = "sell"
 
 
 class PortfolioCreate(BaseModel):
-    """
-    Создание нового портфеля
-    """
-
+    """Создание нового портфеля."""
     name: str = Field(
         ...,
         min_length=1,
@@ -39,10 +33,7 @@ class PortfolioResponse(BaseModel):
 
 
 class TransactionCreate(BaseModel):
-    """
-    Создание новой транзакции
-    """
-
+    """Создание новой транзакции."""
     portfolio_id: int
     ticker: str = Field(
         ...,
@@ -62,10 +53,7 @@ class TransactionCreate(BaseModel):
     @field_validator("transaction_date", mode="before")
     @classmethod
     def set_default_date(cls, v: Optional[datetime]) -> datetime:
-        """
-        Если дата не передана, устанавливаем текущую UTC.
-        """
-
+        """Если дата не передана, устанавливаем текущую UTC."""
         return v or datetime.now(timezone.utc).replace(tzinfo=None)
 
 
@@ -86,9 +74,7 @@ class TransactionResponse(BaseModel):
 
 
 class PortfolioPerformance(BaseModel):
-    """
-    Вычисление метрик для портфеля
-    """
+    """Вычисление метрик для портфеля."""
 
     portfolio_id: int
     total_invested: Decimal = Field(

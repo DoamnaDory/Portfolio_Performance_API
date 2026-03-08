@@ -20,7 +20,6 @@ def get_price_service() -> PriceService:
     return PriceService()
 
 
-# Единая функция-зависимость для получения PortfolioService
 def get_portfolio_service(db: AsyncSession = Depends(get_db),
                           price_service: PriceService = Depends(
                               get_price_service)) -> PortfolioService:
@@ -57,10 +56,7 @@ async def create_portfolio(
 async def get_portfolios(
         service: PortfolioService = Depends(get_portfolio_service)
 ):
-    """
-    Получить список всех портфелей.
-    """
-
+    """Получить список всех портфелей."""
     return await service.get_all_portfolios()
 
 
@@ -157,7 +153,7 @@ async def get_transactions(
     if not portfolio:
         raise HTTPException(status_code=404, detail="Портфель не найден")
 
-    return await service.get_transactions_for_portfolio(portfolio_id)
+    return await service.get_portfolio_transactions(portfolio_id)
 
 
 @router.get(
@@ -177,7 +173,5 @@ async def get_portfolio_performance(
 
 @router.get("/", tags=["Main"])
 async def root():
-    """
-    Эндпоинт для проверки работоспособности API.
-    """
+    """Эндпоинт для проверки работоспособности API."""
     return {"message": "Portfolio Performance API"}
