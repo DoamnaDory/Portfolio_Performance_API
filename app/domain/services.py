@@ -8,7 +8,8 @@ from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.domain.models import PortfolioPerformance, TransactionType
+from app.domain.models import PortfolioPerformance, TransactionType, \
+    PortfolioResponse
 from app.infrastructure.models_orm import Portfolio, Transaction
 from app.infrastructure.repositories import TransactionRepository, \
     PortfolioRepository
@@ -141,7 +142,7 @@ class PriceService:
 
 class PortfolioService:
     """
-    Сервис для расчёта метрик эффективности инвестиционного портфеля и CRUD операций с портфелями."""
+    Сервис для расчёта метрик эффективности инвестиционного портфеля и crud операций с портфелями."""
 
     def __init__(self, db: AsyncSession,
                  price_service: Optional[PriceService] = None):

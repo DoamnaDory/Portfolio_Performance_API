@@ -9,8 +9,6 @@ from app.domain.models import (
     TransactionResponse
 )
 from app.domain.services import PortfolioService, PriceService
-from app.infrastructure.repositories import TransactionRepository, \
-    PortfolioRepository
 from typing import List
 from functools import lru_cache
 
