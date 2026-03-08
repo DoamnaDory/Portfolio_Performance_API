@@ -28,6 +28,28 @@ class PortfolioRepository:
         result = await self.db.execute(select(Portfolio))
         return result.scalars().all()
 
+    async def get_portfolio_with_transaction_count(self, portfolio_id: int) -> \
+    Optional[tuple[Portfolio, int]]:
+        result = await self.db.execute(
+            select(Portfolio,
+                   func.count(Transaction.id).label("transaction_count"))
+            .outerjoin(Transaction, Transaction.portfolio_id == Portfolio.id)
+            .where(Portfolio.id == portfolio_id)
+            .group_by(Portfolio.id)
+        )
+        row = result.first()
+        return (row[0], row[1]) if row else None
+
+    async def get_all_portfolios_with_transaction_count(self) -> List[
+        tuple[Portfolio, int]]:
+        result = await self.db.execute(
+            select(Portfolio,
+                   func.count(Transaction.id).label("transaction_count"))
+            .outerjoin(Transaction, Transaction.portfolio_id == Portfolio.id)
+            .group_by(Portfolio.id)
+        )
+        return [(row[0], row[1]) for row in result.all()]
+
     async def delete_portfolio(self, portfolio_id: int) -> bool:
         portfolio = await self.get_portfolio(portfolio_id)
         if not portfolio:

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.domain.models import PortfolioPerformance, TransactionType, \
-    PortfolioResponse
+    PortfolioResponse, PortfolioCreate
 from app.infrastructure.models_orm import Portfolio, Transaction
 from app.infrastructure.repositories import TransactionRepository, \
     PortfolioRepository
@@ -151,15 +151,45 @@ class PortfolioService:
         self.portfolio_repo = PortfolioRepository(db)
         self.price_service = price_service
 
-    async def create_portfolio(self, portfolio_data) -> Portfolio:
-        db_portfolio = await self.portfolio_repo.create_portfolio(portfolio_data)
-        return db_portfolio
+    async def create_portfolio(self,
+                               portfolio_create: PortfolioCreate) -> PortfolioResponse:
+        db_portfolio = await self.portfolio_repo.create_portfolio(
+            portfolio_create)
+        portfolio_data = {
+            "id": db_portfolio.id,
+            "name": db_portfolio.name,
+            "created_at": db_portfolio.created_at,
+            "transaction_count": 0
+        }
+        return PortfolioResponse.model_validate(portfolio_data)
 
-    async def get_portfolio(self, portfolio_id: int) -> Optional[Portfolio]:
-        return await self.portfolio_repo.get_portfolio(portfolio_id)
+    async def get_portfolio(self, portfolio_id: int) -> Optional[
+        PortfolioResponse]:
+        portfolio_with_count = await self.portfolio_repo.get_portfolio_with_transaction_count(
+            portfolio_id)
+        if not portfolio_with_count:
+            return None
+        portfolio, count = portfolio_with_count
+        portfolio_data = {
+            "id": portfolio.id,
+            "name": portfolio.name,
+            "created_at": portfolio.created_at,
+            "transaction_count": count
+        }
+        return PortfolioResponse.model_validate(portfolio_data)
 
-    async def get_all_portfolios(self) -> List[Portfolio]:
-        return await self.portfolio_repo.get_all_portfolios()
+    async def get_all_portfolios(self) -> List[PortfolioResponse]:
+        portfolios_with_counts = await self.portfolio_repo.get_all_portfolios_with_transaction_count()
+        result = []
+        for portfolio, count in portfolios_with_counts:
+            portfolio_data = {
+                "id": portfolio.id,
+                "name": portfolio.name,
+                "created_at": portfolio.created_at,
+                "transaction_count": count
+            }
+            result.append(PortfolioResponse.model_validate(portfolio_data))
+        return result
 
     async def delete_portfolio(self, portfolio_id: int) -> bool:
         return await self.portfolio_repo.delete_portfolio(portfolio_id)

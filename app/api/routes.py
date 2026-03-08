@@ -23,7 +23,7 @@ def get_price_service() -> PriceService:
 # Единая функция-зависимость для получения PortfolioService
 def get_portfolio_service(db: AsyncSession = Depends(get_db),
                           price_service: PriceService = Depends(
-                              get_price_service)):
+                              get_price_service)) -> PortfolioService:
     return PortfolioService(db, price_service)
 
 

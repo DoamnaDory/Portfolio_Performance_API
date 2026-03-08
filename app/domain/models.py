@@ -33,6 +33,7 @@ class PortfolioResponse(BaseModel):
     id: int
     name: str
     created_at: datetime
+    transaction_count: int = Field(..., description="Количество транзакций в портфеле")
 
     model_config = {'from_attributes': True}
 
