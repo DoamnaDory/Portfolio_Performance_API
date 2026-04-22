@@ -12,12 +12,12 @@
 
 ## 📦 Стек технологий
 - Python 
-- FastAPI — фреймворк
-- PostgreSQL + asyncpg — асинхронная работа с БД
-- SQLAlchemy (async) — ORM
-- Alembic — миграции
-- Pydantic — валидация и настройки
-- Docker + docker-compose — контейнеризация
+- FastAPI - фреймворк
+- PostgreSQL + asyncpg - асинхронная работа с БД
+- SQLAlchemy - ORM
+- Alembic - миграции
+- Pydantic - валидация и настройки
+- Docker + docker-compose - контейнеризация
 
 ## 📁 Назначение ключевых директорий
 - app/api - Содержит FastAPI-роуты. Преобразует HTTP-запросы в вызовы сервисов и формирует ответы.
